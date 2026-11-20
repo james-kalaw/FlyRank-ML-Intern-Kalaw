@@ -1,0 +1,20 @@
+{
+  "rule": "feedly_article x feb_impressions",
+  "pages": 65756,
+  "flagged": 704,
+  "base_rate_pct": 25.1,
+  "precision_pct": {
+    "@10": 70.0,
+    "@50": 46.0,
+    "@100": 51.0,
+    "@500": 49.6
+  },
+  "random_pct": {
+    "@10": 21.0,
+    "@50": 24.2,
+    "@100": 25.5,
+    "@500": 25.2
+  },
+  "flagged_clients": 7,
+  "biggest_client_share_pct": 45.0
+}
