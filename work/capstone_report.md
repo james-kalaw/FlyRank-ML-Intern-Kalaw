@@ -71,13 +71,42 @@ Colab Secrets only.
 
 ## 3. Baseline
 
-**To do (Week 4, ML-07).** The transparent rule or score built first, why it is a fair comparison,
-and its numbers on the same data and metric.
+**The rule (plain words):** review **feedly articles** first, starting with the ones that had the most
+February impressions. Every other page gets score 0.
+
+- Score: `is_feedly × feb_impressions` (no fitted weights). Reason code: `feedly_article`.
+  Action label: `review_for_decline_risk`. Reads only `content_type` and `feb_impressions`.
+- Notebook: `work/notebooks/w04_baseline_score.ipynb`. Metrics receipt: `work/outputs/baseline_metrics.json`.
+
+**How it was chosen:** the first rule idea ("young pages on low-volume keywords") leaned on page age and
+search volume (search volume is the signal behind FlyRank's quick-win flag). Both checks came back
+**FALSE**: every bucket was within 2 points of the 25.1% base rate. Instead of building a rule that would
+do no better than random, I checked four more clues with charts and picked the strongest using a rule
+written before looking (the 500+ page bucket farthest from the base rate): content type, where feedly
+articles declined at 53.3% (+28.2 points).
+
+**Why it is a fair comparison:** same frame (65,756 pages, Feb 2026 features → Mar 2026 outcome), same
+label, and the same metric (precision@K) that the model will use.
+
+**Numbers (base rate 25.1%; random picking averaged over 20 shuffles):**
+
+| K | Rule | Random picking |
+|---|---|---|
+| 10 | 70.0% | 21.0% |
+| 50 | 46.0% | 24.2% |
+| 100 | 51.0% | 25.5% |
+| 500 | 49.6% | 25.2% |
+
+**Known weaknesses:** only 704 pages are feedly articles, so the rule cannot rank anything past them;
+45% of those pages come from one client (6 of the top 10); sorting by February impressions did not help
+(top 50: 46.0% vs 53.3% for all feedly pages). Six clues were tested, so part of the gap may be luck.
 
 ## 4. Model / analysis
 
 **Method:** signal analysis. Each signal is compared against one outcome using a grouped
-comparison, then checked with tier tables to catch shapes the comparison misses.
+comparison, then checked with tier tables and bar charts to catch shapes the comparison misses.
+Signals checked on the warehouse frame so far: page age, search volume, content type, February
+position, CTR vs position peers, February impressions.
 
 **Outcome (one sentence):** a page is declining when its March 2026 impressions per day are more
 than 20% below its February 2026 impressions per day (pages with at least 100 February impressions).
@@ -90,21 +119,35 @@ percentage points. Thresholds set before looking: notable ≥ 5, weak 2–5, non
 
 **Left out on purpose:** see Section 2.
 
-**To do (Weeks 4–5):** run the metric on all five features in the warehouse frame; decide on
-`word_count`; explain the final method choice.
+**To do (Week 5, ML-08):** train a model on the same frame and compare it with the baseline at the
+same K; test whether content type plus CTR vs peers beats content type alone; decide on `word_count`.
 
 ## 5. Evaluation
 
 **So far:** splits are grouped by client (whole clients go to train or test, never both), with
 `random_state=42`. Base rates are reported next to every score: 54.2% declining (starter CSV),
-25.1% (warehouse frame).
+25.1% (warehouse frame). The baseline is also compared with random picking at each K.
 
-**To do (Week 6, ML-09):** client-by-client check of every notable signal; repeat on a second
-month pair; error analysis.
+**To do (Week 6, ML-09):** client-by-client check of every notable signal, starting with feedly
+articles (one client holds 45% of them); repeat on a second month pair; error analysis.
 
 ## 6. Interpretation
 
-**Findings so far (observed associations, not causes):**
+**Warehouse, Feb → Mar 2026 (features before outcome), observed associations, not causes:**
+- **Page age and search volume showed no relationship with decline** (every bucket within 2 points of
+  the 25.1% base rate), unlike the starter CSV below. A pattern that looks strong when signal and
+  outcome are measured in the same window can disappear when the signal comes first.
+- **Content type was the strongest clue.** Feedly articles declined at 53.3% (704 pages) vs 24.8% for
+  keyword articles. All feedly pages lack search volume, which explains most of the "missing volume"
+  bucket (42.9%).
+- **Higher-ranked pages declined more often.** From rank 1 to 50, decline fell from 28.1% (top 3) to
+  13.7% (ranks 21–50), the opposite of "low-ranked pages are the ones at risk."
+- **Pages with fewer clicks than pages at the same rank declined more** (28.8% vs 18.8–20.6%),
+  which supports the idea behind FlyRank's CTR-fix flag, moderately. Inside the feedly group, pages
+  that declined had about half the CTR-vs-peers of those that didn't (0.30 vs 0.60).
+- **February impressions were a weak clue** (every bucket within 2.4 points).
+
+**Starter CSV (same 90-day window for signal and outcome), earlier findings:**
 - **Page age runs opposite to the popular belief.** Starter CSV: decline rate falls from 66.9%
   (31–90 days) to 42.6% (365+ days). Top-vs-bottom gap: −16.4 points.
 - **Position is hill-shaped.** Top 3 (24.1%) and deep results (34.4%) declined least; middle tiers
@@ -116,7 +159,8 @@ month pair; error analysis.
   declined more (+10.3). Not yet trusted (snapshot problem, missing values by content type).
 - **Search volume:** pages on higher-volume keywords declined less (−12.2).
 
-**To do:** confirm these on the warehouse frame; feature importance; negative results.
+**To do:** explain why the starter-CSV patterns did not hold in Feb → Mar; feature importance from the
+model; check the feedly result client by client; investigate the position-0 quirk.
 
 ## 7. Recommendation
 
@@ -125,12 +169,16 @@ month pair; error analysis.
 ## 8. Reproducibility
 
 - **Notebooks, in order:** `work/notebooks/w01_research_question.ipynb`,
-  `w02_ml_task_framing.ipynb`, `w03_data_contract.ipynb` (all committed with outputs).
+  `w02_ml_task_framing.ipynb`, `w03_data_contract.ipynb`, `w04_baseline_score.ipynb`
+  (all committed with outputs).
+- **Outputs:** `w04_baseline_score.ipynb` writes `work/outputs/baseline_action_score.csv` (git-ignored,
+  regenerated on every run) and `work/outputs/baseline_metrics.json` (committed).
 - **Run:** open each in Colab from the repo, add the Hugging Face READ token as the Colab Secret
   `HF_TOKEN` (Week 3+), then Runtime → Run all.
 - **Data:** starter CSV in the repo; warehouse release build v20260703 on Hugging Face.
 - **Seeds:** `random_state=42` for client-holdout splits and models.
-- **Environment:** Google Colab, pandas, scikit-learn, DuckDB (installed in the notebook).
+- **Environment:** Google Colab, pandas, scikit-learn, matplotlib, DuckDB 1.1+ (installed in the
+  notebook; if Colab already loaded an older DuckDB, Runtime → Restart session first).
 - **To do:** pin versions; commit any sealed-test cell and its metrics file if a sealed evaluation
   is claimed.
 

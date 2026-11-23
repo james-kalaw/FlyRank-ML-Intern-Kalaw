@@ -7,7 +7,7 @@ catch up quickly (paste this file in).
 > **Data safety:** this file holds **aggregate numbers only** (medians, rates, counts, AUC).
 > No raw rows, no `content_hash_id` / `client_hash_id` values, no client details. Keep it that way.
 
-_Last updated: 2026-11-20 (after ML-04)_
+_Last updated: 2026-11-21 (after ML-07)_
 
 ---
 
@@ -23,6 +23,7 @@ _Last updated: 2026-11-20 (after ML-04)_
 | **Outcome** | `is_declining`: impressions dropped more than 20% (warehouse: per day, Feb → Mar) |
 | **Metric** | Decline-rate gap: decline rate in top 25% of a signal minus bottom 25%, in points. Notable ≥ 5, weak 2–5, none < 2 (set in advance) |
 | **Output** | A signal report: each tested signal gets a verdict, plus content recommendations |
+| **Baseline (ML-07)** | Feedly articles first, ordered by Feb impressions. Precision@100 **51.0%**, @500 **49.6%** vs base rate 25.1% (random ~25%) |
 | **Claims allowed** | Observed, measured, directional, decision-support. Never causal, never "how Google works" |
 
 **One-paragraph frame (from ML-02):**
@@ -37,7 +38,9 @@ never proof of how Google's algorithm works.
 
 **Candidate original angle (not locked in):** a "signal reliability scorecard" that tests each
 signal more than one way (end-to-end gap, tier table, interaction) and flags where they disagree.
-Evidence it matters: position looked "weak" by the gap (−3.7) but is hill-shaped in the tier table (F13).
+Evidence it matters: position looked "weak" by the gap (−3.7) but is hill-shaped in the tier table (F13);
+and page age / search volume looked notable in the same-window starter CSV but were FALSE in the
+Feb → Mar warehouse test (B1, B2).
 
 ---
 
@@ -54,8 +57,8 @@ Submission = repo URL `https://github.com/james-kalaw/FlyRank-ML-Intern-Kalaw` o
 | ML-04 | `w03_data_contract.ipynb` | Complete 2026-11-20 (confirm portal submission) | Feb → Mar contract on warehouse; 3 queries; leak trap (W1–W8) |
 | ML-05 | `w03_feature_leakage_check.ipynb` | Optional (card retired 2026-07-13; core moved to ML-04) | |
 | ML-06 | `w04_signal_audit.ipynb` | Optional (card retired 2026-07-13) | Closest fit to Lane 1 |
-| ML-07 | `w04_baseline_score.ipynb` | **Next** | |
-| ML-08 | `w05_model.ipynb` | | |
+| ML-07 | `w04_baseline_score.ipynb` | Complete 2026-11-21 (confirm portal submission) | Signal checks, EDA charts, feedly-first rule, top-10 review (B1–B12) |
+| ML-08 | `w05_model.ipynb` | **Next** | Must beat the baseline on the same frame and metric |
 | ML-09 | `w06_validation_audit.ipynb` | | |
 | ML-10 | `w07_action_playbook.ipynb` | | |
 | ML-11 | `capstone.ipynb` + deployed paper | | URL goes in `submission/paper_url.txt` |
@@ -143,7 +146,57 @@ test split held 60% of pages from 25% of clients (uneven client sizes again).
 
 ---
 
-## 5. Data facts and traps
+## 5. Findings: baseline, Feb → Mar 2026 warehouse frame (ML-07, Week 4)
+
+Same frame and label as ML-04 (65,756 pages, 26 clients, base rate **25.1%**). Verdict rules set before
+looking (buckets with 500+ pages): CONFIRMED / OPPOSITE = end buckets 5+ points apart (right / wrong way);
+MIXED = ups and downs or only 2–5 points; FALSE = every bucket within 2 points of the base rate.
+
+**Signal checks for the first rule idea ("young pages on low-volume keywords"):**
+
+| # | Signal | Buckets (% declining, n) | Verdict |
+|---|---|---|---|
+| B1 | Page age (days on 1 Mar) | <90: 24.9% (10,859) · 90–179: 27.0% (14,436) · 180–269: 23.8% (23,063) · 270–364: 25.7% (10,439) · 365+: 25.2% (6,959) | **FALSE** (max 1.9 pts) |
+| B2 | Search volume (flag-linked: quick-win) | 0: 26.0% (20,742) · 1–10: 23.6% (18,967) · 11–100: 23.7% (16,753) · 101–1000: 26.3% (6,619) · 1001+: 26.8% (1,329) · **missing: 42.9% (1,346)** | **FALSE** (max 1.7 pts); missing bucket +17.8 |
+
+Both rule signals failed, so the rule was changed before it was built. Contrast with the starter CSV
+(same-window measure): age gap −16.4, volume gap −12.2 (F7, F8).
+
+**EDA on four more clues (bar charts in the notebook):**
+
+| # | Clue | Result | Reading |
+|---|---|---|---|
+| B3 | Content type | keyword article 24.8% (65,047) · **feedly article 53.3% (704)** · comparison article 80.0% (5, too few) | Strongest: +28.2 pts. All 704 feedly pages have missing search volume (missing bucket = 704 feedly + 642 keyword) |
+| B4 | Feb position | 0 (no data) 42.2% (1,251) · 1–3 28.1% (12,026) · 4–10 26.7% (32,336) · 11–20 23.3% (11,806) · 21–50 **13.7%** (7,411) · 51+ 21.7% (926) | From rank 1 to 50, higher-ranked pages declined more. Not hill-shaped as in F13. "0" is a data quirk |
+| B5 | CTR vs position peers (flag-linked: CTR-fix) | <0.5× 28.8% (34,346) · 0.5–0.9× 23.3% (10,096) · 0.9–1.1× 22.0% (3,738) · 1.1–2× **18.8%** (10,249) · 2×+ 20.6% (7,327) | Fewer clicks than peers → more decline. MIXED (end gap −8.2, small uptick at the end). Peer CTR = group clicks ÷ group impressions |
+| B6 | Feb impressions | 100–249 26.8% · 250–499 27.5% · 500–999 25.9% · 1k–2.5k 23.0% · 2.5k–10k 23.1% · 10k+ 24.4% | Weak (max 2.4 pts) |
+
+Selection rule (set before looking): use the clue whose 500+ page bucket is farthest from the base rate →
+**content type (feedly article, +28.2)**. Six clues tested in total, so some luck is possible.
+
+**The baseline rule:** feedly articles first, ordered by February impressions; everything else score 0.
+Score `is_feedly × feb_impressions`; reason code `feedly_article`; action `review_for_decline_risk`.
+Reads only `content_type` and `feb_impressions`. Queue written to `work/outputs/baseline_action_score.csv`
+(git-ignored); metrics in `work/outputs/baseline_metrics.json`.
+
+| # | Check | Result |
+|---|---|---|
+| B7 | Precision@K (rule / random picking, 20 shuffles) | @10 **70.0%** / 21.0% · @50 **46.0%** / 24.2% · @100 **51.0%** / 25.5% · @500 **49.6%** / 25.2% |
+| B8 | All flagged pages | 704 flagged; 375 declined → **53.3%** |
+| B9 | Client concentration | Flagged pages come from **7** clients; one client holds **45.0%** (317 pages); 6 of the top 10 are from that client |
+| B10 | Top-10 review | **7 of 10** declined. Shared risks: a February spike returning to normal, traffic moving to a sibling page (not checked) |
+| B11 | Weak picks (feedly misses vs hits, medians) | CTR vs peers **0.60** vs **0.30**; Feb impressions 291 vs 232; position 8.75 vs 7.98; age 221 vs 206 days |
+| B12 | Ordering | Sorting by Feb impressions did not help: top 50 = 46.0% vs 53.3% for all feedly pages. Content type does the work |
+
+Leakage check passed: the rule reads no March data, label, excluded column, or product flag.
+`content_type` comes from the present-day `dim_content` snapshot; assumed stable since publishing.
+
+**Hint for ML-08:** within feedly pages, misses had about twice the CTR-vs-peers of hits, so a model that
+combines content type with CTR vs peers may beat the baseline.
+
+---
+
+## 6. Data facts and traps
 
 **Starter CSV** (`docs/data-dictionary.md`, `skills/flyrank/flyrank-data`)
 - Label columns, never inputs: `trend_direction`, `trend_pct`. Outcome ingredients: six `*_last_30d` / `*_prev_30d`.
@@ -151,7 +204,9 @@ test split held 60% of pages from 25% of clients (uneven client sizes again).
 - Missingness follows `content_type`; don't blind `fillna(0)`.
 
 **Warehouse** (release build v20260703, Hugging Face, gated)
-- Daily grain: report_date × client × content. Position column: `gsc_avg_position` (aggregate weighted by impressions).
+- Daily grain: report_date × client × content. Position column: `gsc_avg_position` (aggregate it weighted by impressions).
+- `gsc_avg_position = 0` with impressions: 1,251 frame pages (42.2% declining) — a quirk; keep it as its own bucket.
+- DuckDB `CREATE SECRET` needs DuckDB 1.1+. If Colab already loaded an older copy: Runtime → Restart session.
 - Flags can be TRUE / FALSE / NULL: always filter with `IS TRUE`.
 - Unbalanced panel: check `dim_clients.gsc_data_start` before any window.
 - `dim_content` is a present-day snapshot: `content_updated_date`, `last_optimized_date`, `is_deleted`,
@@ -161,7 +216,7 @@ test split held 60% of pages from 25% of clients (uneven client sizes again).
 
 ---
 
-## 6. Working rules
+## 7. Working rules
 
 **Data and AI**
 - Share only code, errors, column names, and aggregate outputs with AI tools. Never raw rows, the CSV,
@@ -181,7 +236,7 @@ test split held 60% of pages from 25% of clients (uneven client sizes again).
 
 ---
 
-## 7. Decision log
+## 8. Decision log
 
 | Date | Decision | Why |
 |---|---|---|
@@ -192,15 +247,24 @@ test split held 60% of pages from 25% of clients (uneven client sizes again).
 | 2026-11-19 | 5 features: content age, word count, search volume, Feb avg position, Feb impressions | Strongest Week 2 signals + visibility before decision day |
 | 2026-11-20 | Keep Lane 1 at the lane lock | Continuous story since Week 1; foundation already built |
 | 2026-11-20 | Follow FlyRank rules strictly; check every notebook against its card | Goal: capstone graded Pass |
+| 2026-11-20 | First rule idea: young pages on low-volume keywords (search volume = flag-linked) | Strongest Week 2 gaps; staleness can't be measured honestly (W8) |
+| 2026-11-20 | Both signals FALSE → change the rule before building it | A rule on FALSE signals is no better than random; the card counts a clear negative as a win |
+| 2026-11-20 | Pick the next clue by a rule set before looking: farthest 500+ bucket from the base rate | Avoid choosing what we hoped to see |
+| 2026-11-20 | If every clue is weak, still use the strongest and say the baseline is weak | Skill: a baseline must be "honestly beatable"; testing more clues raises luck |
+| 2026-11-21 | Baseline = feedly articles first, by Feb impressions | Content type was the strongest clue (+28.2) |
 
 ---
 
-## 8. Open issues / next steps
+## 9. Open issues / next steps
 
-- [ ] **ML-07 (next):** build the transparent baseline.
+- [x] ~~ML-07: build the transparent baseline~~ (done 2026-11-21).
+- [ ] **ML-08 (next):** train a model on the same frame; it must beat precision@100 51.0% / @500 49.6%.
+- [ ] Client-by-client check of the feedly result (one client holds 45% of feedly pages).
+- [ ] Test whether combining content type with CTR vs peers improves on the baseline (B11).
+- [ ] Explain why page age and search volume were notable in the starter CSV but FALSE in Feb → Mar.
 - [ ] Decide what to do with `word_count` (76.5% updated after 1 Mar): test on not-updated pages only, or drop it.
 - [ ] Re-check F9 (longer pages declined more) by `content_type`.
-- [ ] Investigate `avg_position = 0` and `word_count = 0` in the warehouse frame.
+- [ ] Investigate `avg_position = 0` (1,251 pages, 42.2% declining) and `word_count = 0` in the warehouse frame.
 - [ ] Rule out look-alikes of decline (lane guide §7): consolidation (sibling pages), seasonality, noise.
 - [ ] Client-by-client check of every notable signal (Week 6), since a few clients hold most pages.
 - [ ] Repeat the Feb → Mar result on at least one other mid-panel month pair.
