@@ -1,0 +1,64 @@
+{
+  "pages": 65756,
+  "base_rate_pct": 25.1,
+  "split": "GroupKFold(5) by client",
+  "seed": 42,
+  "sklearn": "1.6.1",
+  "chosen_model": "Logistic Regression",
+  "results": [
+    {
+      "ranking": "Base rate",
+      "P@10": 25.1,
+      "P@50": 25.1,
+      "P@100": 25.1,
+      "P@500": 25.1,
+      "AUC": 0.5,
+      "avg_precision": 0.251
+    },
+    {
+      "ranking": "Random picking (20 shuffles)",
+      "P@10": 22.5,
+      "P@50": 24.2,
+      "P@100": 25.4,
+      "P@500": 24.2,
+      "AUC": 0.5,
+      "avg_precision": 0.251
+    },
+    {
+      "ranking": "Baseline rule (feedly first)",
+      "P@10": 70.0,
+      "P@50": 46.0,
+      "P@100": 51.0,
+      "P@500": 49.6,
+      "AUC": 0.486,
+      "avg_precision": 0.258
+    },
+    {
+      "ranking": "Logistic Regression",
+      "P@10": 80.0,
+      "P@50": 50.0,
+      "P@100": 54.0,
+      "P@500": 51.0,
+      "AUC": 0.545,
+      "avg_precision": 0.281
+    },
+    {
+      "ranking": "Random Forest",
+      "P@10": 70.0,
+      "P@50": 46.0,
+      "P@100": 47.0,
+      "P@500": 42.2,
+      "AUC": 0.567,
+      "avg_precision": 0.304
+    },
+    {
+      "ranking": "Gradient Boosting",
+      "P@10": 50.0,
+      "P@50": 48.0,
+      "P@100": 35.0,
+      "P@500": 30.2,
+      "AUC": 0.554,
+      "avg_precision": 0.291
+    }
+  ]
+}
